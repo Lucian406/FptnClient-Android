@@ -72,25 +72,32 @@ public class DomainBlocker {
         XLog.tag(TAG).i("Blocklist DNS loaded [domains=%d]", blockedDomains.size());
     }
 
-    // Parses a user-entered domain list: newline/comma separated, optional
+    // Parses a user-entered domain list: newline/comma separated, mandatory
     // "domain:" prefix (fptn desktop config format).
     // Supports:
-    //   - full domains: "ixbt.com", "суточно.ру"
-    //   - whole zones: "ru", "by", "kz", "рф" (or ".ru" with leading dot)
-    //   - Cyrillic domains/zones are converted to Punycode (IDN)
+    // \- full domains: "domain:ixbt.com", "domain:суточно.ру"
+    // \- whole zones: "domain:ru", "domain:by", "domain:kz", "domain:рф" (or ".ru" with leading dot)
+    // \- Cyrillic domains/zones are converted to Punycode (IDN)
     private static Set<String> parseDomainBlacklist(String text) {
         Set<String> domains = new HashSet<>();
         if (text == null) {
             return domains;
         }
-        for (String entry : text.split("[\\n,]")) {
+
+        for (String entry : text.split("[\n,]")) {
             String domain = entry.trim().toLowerCase();
             if (domain.isEmpty()) {
                 continue;
             }
+            
+            // ДЕЛАЕМ ПРЕФИКС ОБЯЗАТЕЛЬНЫМ:
             if (domain.startsWith("domain:")) {
                 domain = domain.substring("domain:".length()).trim();
+            } else {
+                // Если префикса нет, пропускаем эту строку
+                continue;
             }
+
             // Allow leading dot for zones: ".ru" → "ru"
             if (domain.startsWith(".")) {
                 domain = domain.substring(1);
@@ -98,14 +105,16 @@ public class DomainBlocker {
             if (domain.isEmpty()) {
                 continue;
             }
+
             // Convert Cyrillic to Punycode: "суточно.ру" → "xn--80akhb1ah.xn--p1acf"
-            //                                 "рф" → "xn--p1ai"
+            // "рф" → "xn--p1ai"
             try {
                 domain = IDN.toASCII(domain, IDN.ALLOW_UNASSIGNED);
             } catch (IllegalArgumentException e) {
                 // Invalid domain, skip
                 continue;
             }
+
             // Accept both full domains (with dot) AND bare zones (without dot)
             if (!domain.isEmpty()) {
                 domains.add(domain);
